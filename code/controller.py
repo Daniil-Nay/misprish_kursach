@@ -1,10 +1,12 @@
+import json
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QPushButton, QApplication, QScrollArea, QGridLayout, QMainWindow
 from PyQt5.QtCore import Qt
 
 from code.extra_window import AddWindow
-from code.model import Database
 from code.view import TableView
 from code.static_funcs import get_russian_table_name
+from code.database_dao import DatabaseDAO
+
 
 class Controller:
     """Контроллер для управления главным окном приложения."""
@@ -18,11 +20,9 @@ class Controller:
         """
         self.root = root
         root.resize(800, 600)
-        self.db = Database(dbname="mispris3",
-                           user="postgres",
-                           password="1",
-                           host="localhost",
-                           port="5432")
+
+        # Инициализация DatabaseDAO
+        self.db_dao = DatabaseDAO('database.ini', 'queries.json')
 
         self.central_widget = QWidget()
         self.central_widget.setStyleSheet("background-color: lightblue;")
@@ -120,15 +120,13 @@ class Controller:
 
     def get_table_names(self) -> list:
         """Возвращает список имен всех таблиц в базе данных."""
-        sql_query = "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public';"
-        return self.db.execute_query(sql_query)
+        return self.db_dao.execute_query("get_table_names")
 
     def show_table_data(self, table_name: str):
         """Отображает данные из выбранной таблицы."""
-        sql_query = f"SELECT * FROM {table_name}"
-        result = self.db.execute_query(sql_query)
+        result = self.db_dao.execute_query("select_all_from_table", {"table_name": table_name})
         if result:
-            column_names = [description[0] for description in self.db.cur.description]
+            column_names = [description[0] for description in self.db_dao.cur.description]
             print(f"Названия столбцов:", column_names)
             print(f"Данные из таблицы {table_name}:", *result, sep="\n")
             self.view.update_data(result, column_names)
@@ -152,7 +150,7 @@ class Controller:
     def open_add_window(self):
         """Открывает окно для добавления новой записи."""
         table_names = self.get_table_names()
-        add_window = AddWindow(table_names, self.db)
+        add_window = AddWindow(table_names, self.db_dao)
         add_window.exec_()
 
 
