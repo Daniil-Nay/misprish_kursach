@@ -59,3 +59,9 @@ class DatabaseDAO:
         """Закрывает соединение с базой данных."""
         self.cur.close()
         self.connection.close()
+
+    def get_all_from_table(self, table_name):
+        query = f"SELECT * FROM {table_name}"
+        self.cur.execute(query)
+        return self.cur.fetchall()
+

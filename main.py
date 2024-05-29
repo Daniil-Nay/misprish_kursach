@@ -2,6 +2,7 @@ import sys
 from PyQt5.QtWidgets import QApplication, QMainWindow
 from code.controller import Controller
 
+
 class MainWindow(QMainWindow):
     """Главное окно приложения."""
 
@@ -10,6 +11,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("Курсовая работа")
         self.setFixedSize(1200, 600)
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

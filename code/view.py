@@ -45,3 +45,26 @@ class TableView(QWidget):
             for col_idx, cell_data in enumerate(row_data):
                 item = QTableWidgetItem(str(cell_data))
                 self.table_widget.setItem(row_idx, col_idx, item)
+        scroll_bar = self.table_widget.verticalScrollBar()
+        scroll_bar.setStyleSheet("""
+                            QScrollBar:vertical {
+                                border: none;
+                                width: 14px;
+                                margin: 15px 0 15px 0;
+                            }
+                            QScrollBar::handle:vertical {
+                                background: gray;
+        border-radius: 5px;
+                                min-height: 30px;
+                            }
+                            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                                border: none;
+                                background: none;
+                            }
+
+                            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+                                background: none;
+                            }
+                        """)
+
+

@@ -1,51 +1,50 @@
 from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QPushButton, QLineEdit, QComboBox, QMessageBox
 from PyQt5.QtCore import Qt
-from code.model import Database
+
+from code.database_dao import DatabaseDAO
+
 
 class AddWindow(QDialog):
     """Окно для добавления записей в базу данных."""
 
-    def __init__(self, table_names: list, db: Database):
+    def __init__(self, table_names: list, db_dao: DatabaseDAO):
         """
         Конструктор класса.
 
         Параметры:
         - table_names (list): Список имен таблиц.
-        - db (Database): Объект для работы с базой данных.
+        - db_dao (DatabaseDAO): Объект для работы с базой данных.
         """
         super().__init__()
 
-        self.db = db
+        self.db_dao = db_dao
 
         self.setWindowTitle("Добавить запись")
-        self.setFixedSize(400, 250)  # Фиксированный размер окна
+        self.setFixedSize(400, 400)  # Фиксированный размер окна
 
-        layout = QVBoxLayout()
+        self.table_names = table_names
+        self.fields = {}
+
+        self.layout = QVBoxLayout()
 
         label_table = QLabel("Выберите таблицу:")
-        layout.addWidget(label_table)
+        self.layout.addWidget(label_table)
 
         self.table_selector = QComboBox()
-        layout.addWidget(self.table_selector)
+        self.table_selector.addItems(table_names)
+        self.table_selector.currentIndexChanged.connect(self.update_fields)
+        self.layout.addWidget(self.table_selector)
 
-        # Добавляем таблицы в комбобокс
-        for name in table_names:
-            table_name = name[0] if isinstance(name, tuple) else name
-            self.table_selector.addItem(table_name)
+        self.fields_layout = QVBoxLayout()
+        self.layout.addLayout(self.fields_layout)
 
-        label_data = QLabel("Введите данные (через запятую):")
-        layout.addWidget(label_data)
+        self.update_fields()
 
-        # Добавляем поле для ввода данных
-        self.input_field = QLineEdit()
-        layout.addWidget(self.input_field)
-
-        # Кнопка для добавления записи
         add_button = QPushButton("Добавить")
         add_button.clicked.connect(self.add_record)
-        layout.addWidget(add_button)
+        self.layout.addWidget(add_button)
 
-        self.setLayout(layout)
+        self.setLayout(self.layout)
 
         self.setStyleSheet("""
             QDialog {
@@ -58,10 +57,11 @@ class AddWindow(QDialog):
             QComboBox, QLineEdit {
                 background-color: white;
                 color: black;
-                font-size: 12pt;
+                font-size: 10pt;
                 border: 2px solid black;
                 border-radius: 5px;
                 padding: 5px;
+                height: 20px;
             }
             QPushButton {
                 background-color: white;
@@ -80,74 +80,63 @@ class AddWindow(QDialog):
             }
         """)
 
+    def update_fields(self):
+        """Обновляет поля ввода в зависимости от выбранной таблицы."""
+        selected_table = self.table_selector.currentText()
+
+        # Очищаем предыдущие поля
+        for i in reversed(range(self.fields_layout.count())):
+            self.fields_layout.itemAt(i).widget().setParent(None)
+
+        self.fields = {}
+
+        if selected_table == "classification":
+            columns = ["short_name", "name", "id_unit", "id_main_class"]
+        elif selected_table == "product":
+            columns = ["short_name", "name", "id_class"]
+        elif selected_table == "unit":
+            columns = ["short_name", "name", "code"]
+        else:
+            columns = []
+
+        for column in columns:
+            label = QLabel(column)
+            line_edit = QLineEdit()
+            line_edit.setFixedHeight(30)
+            self.fields[column] = line_edit
+            self.fields_layout.addWidget(label)
+            self.fields_layout.addWidget(line_edit)
+
     def add_record(self):
         selected_table = self.table_selector.currentText()
-        input_data = self.input_field.text().strip()
-        # Разделяем вводимые данные по запятым
-        data_list = [item.strip() for item in input_data.split(',')]
-
-        # Получаем имена и типы столбцов для выбранной таблицы
-        column_info = self.get_column_info(selected_table)
-        column_names = [col[0] for col in column_info]
-        column_types = [col[1] for col in column_info]
-
-        if len(data_list) != len(column_names):
-            # Вывести сообщение об ошибке если количество введенных данных не соответствует количеству столбцов
-            QMessageBox.critical(self, "Ошибка", f"Ожидается {len(column_names)} значений, получено {len(data_list)}.")
-            return
-
-        # Преобразуем данные в соответствии с типами столбцов
-        try:
-            data_list = self.convert_data_types(data_list, column_types)
-        except ValueError as e:
-            QMessageBox.critical(self, "Ошибка", str(e))
-            return
-
-        # Формируем SQL-запрос для вставки данных
-        columns = ', '.join(column_names)
-        placeholders = ', '.join(['%s'] * len(data_list))
-        sql_query = f"INSERT INTO {selected_table} ({columns}) VALUES ({placeholders})"
+        data = {column: self.fields[column].text().strip() for column in self.fields}
 
         try:
-            print(f"Executing SQL: {sql_query} with data: {data_list}")  # Отладочная информация
-            self.db.execute_query(sql_query, tuple(data_list))
+            self.insert_data_into_table(selected_table, data)
             QMessageBox.information(self, "Успех", f"Запись успешно добавлена в таблицу {selected_table}.")
+            self.close()
         except Exception as e:
-            QMessageBox.critical(self, "Ошибка", f"Ошибка при добавлении записи: {e}")
-            print(f"Ошибка при выполнении запроса: {e}")
+            QMessageBox.critical(self, "Ошибка", f"Не удалось добавить запись: {str(e)}")
 
-    def get_column_info(self, table_name: str):
-        """Получает информацию о столбцах выбранной таблицы."""
-        # SQL-запрос для получения имен и типов столбцов таблицы
-        sql_query = f"""
-        SELECT column_name, data_type 
-        FROM information_schema.columns 
-        WHERE table_name = '{table_name}';
-        """
-        return self.db.execute_query(sql_query)
+    def insert_data_into_table(self, table_name, data):
+        """Вставляет данные в указанную таблицу."""
+        if table_name == "classification":
+            query = f"""
+            SELECT create_class (%s, %s, %s, %s);
+            """
+            values = (data["short_name"], data["name"], data["id_unit"], data["id_main_class"])
+        elif table_name == "product":
+            query = """
+            SELECT create_product (%s, %s, %s);
+            """
+            values = (data["short_name"], data["name"], data["id_class"])
+        elif table_name == "unit":
+            query = """
+            SELECT create_unit (%s, %s, %s);
+            """
+            values = (data["short_name"], data["name"], data["code"])
+        else:
+            raise ValueError(f"Неизвестная таблица: {table_name}")
 
-    def convert_data_types(self, data_list: list, column_types: list):
-        """Преобразует данные в соответствии с типами столбцов."""
-        converted_data = []
-        for data, col_type in zip(data_list, column_types):
-            if col_type in ['integer', 'smallint', 'bigint']:
-                try:
-                    converted_data.append(int(data))
-                except ValueError:
-                    raise ValueError(f"Значение '{data}' не является корректным числом для столбца типа {col_type}.")
-            elif col_type in ['numeric', 'decimal', 'real', 'double precision']:
-                try:
-                    converted_data.append(float(data))
-                except ValueError:
-                    raise ValueError(
-                        f"Значение '{data}' не является корректным числом с плавающей точкой для столбца типа {col_type}.")
-            elif col_type in ['boolean']:
-                if data.lower() in ['true', 'false']:
-                    converted_data.append(data.lower() == 'true')
-                else:
-                    raise ValueError(
-                        f"Значение '{data}' не является корректным булевым значением для столбца типа {col_type}.")
-            else:
-                # Для строковых и других типов данных
-                converted_data.append(data)
-        return converted_data
+        self.db_dao.cur.execute(query, values)
+        self.db_dao.connection.commit()
