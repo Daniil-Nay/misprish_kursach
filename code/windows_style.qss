@@ -1,0 +1,30 @@
+QDialog {
+    background-color: lightblue;
+}
+
+QLineEdit {
+    background-color: white;
+    color: black;
+    font-size: 10pt;
+    border: 2px solid black;
+    border-radius: 5px;
+    padding: 5px;
+    height: 20px;
+}
+
+QPushButton {
+    background-color: white;
+    color: black;
+    font-size: 12pt;
+    border: 2px solid black;
+    border-radius: 5px;
+    padding: 5px 10px;
+}
+
+QPushButton:hover {
+    background: qlineargradient(
+        x1: 0, y1: 0, x2: 0, y2: 1,
+        stop: 0 black, stop: 1 #333333
+    );
+    color: white;
+}

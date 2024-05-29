@@ -1,4 +1,5 @@
 import configparser
+import logging
 
 import psycopg2
 import json
@@ -65,3 +66,59 @@ class DatabaseDAO:
         self.cur.execute(query)
         return self.cur.fetchall()
 
+    def change_product_class(self, change_id_product: int, new_id_class: int):
+        """Изменяет класс продукта."""
+        query = """
+        DO $$
+        BEGIN
+            IF (SELECT count(*) FROM find_children(%s)) > 1 THEN
+                RAISE EXCEPTION 'Продукт может относится только к терминальному классу';
+            end if;
+            UPDATE Product SET id_class = %s WHERE id_product = %s;
+        END;
+        $$ LANGUAGE plpgsql;
+        """
+        values = (new_id_class, new_id_class, change_id_product)
+        self.cur.execute(query, values)
+        self.connection.commit()
+
+    def find_products_by_class(self, class_id: int) -> list:
+        """Находит продукты, принадлежащие указанному классу классификатора."""
+        query = """
+        SELECT id_product, name
+        FROM Product
+        WHERE id_class = %s
+        """
+        self.cur.execute(query, (class_id,))
+        return self.cur.fetchall()
+
+    def find_children_by_class(self, class_id: int) -> list:
+        query = """
+        SELECT id_class, short_name
+        FROM find_children(%s)
+        """
+        try:
+            self.cur.execute(query, (class_id,))
+            return self.cur.fetchall()
+        except psycopg2.Error as e:
+            logging.error(f"Ошибка выполнения запроса: {e.pgerror}")
+            raise
+    def change_parent_class(self, child_id_class: int, new_parent_id_class: int):
+        """Изменяет родителя указанного класса."""
+        query = """
+        DO $$
+        DECLARE
+            hasCycle boolean;
+        BEGIN
+            hasCycle = cycle(%s, %s);
+            if hasCycle then
+                RAISE EXCEPTION 'Нельзя поменять родителя, потому что создается цикл';
+            else
+                UPDATE classification SET id_main_class = %s WHERE id_class = %s;
+            end if;
+        END;
+        $$ LANGUAGE plpgsql;
+        """
+        values = (child_id_class, new_parent_id_class, new_parent_id_class, child_id_class)
+        self.cur.execute(query, values)
+        self.connection.commit()
