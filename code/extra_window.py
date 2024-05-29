@@ -1,6 +1,7 @@
 from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QPushButton, QLineEdit, QComboBox, QMessageBox
 from PyQt5.QtCore import Qt
 
+from code.constants import file_path
 from code.database_dao import DatabaseDAO
 
 
@@ -46,39 +47,16 @@ class AddWindow(QDialog):
 
         self.setLayout(self.layout)
 
-        self.setStyleSheet("""
-            QDialog {
-                background-color: lightblue;
-            }
-            QLabel {
-                color: black;
-                font-size: 12pt;
-            }
-            QComboBox, QLineEdit {
-                background-color: white;
-                color: black;
-                font-size: 10pt;
-                border: 2px solid black;
-                border-radius: 5px;
-                padding: 5px;
-                height: 20px;
-            }
-            QPushButton {
-                background-color: white;
-                color: black;
-                font-size: 12pt;
-                border: 2px solid black;
-                border-radius: 5px;
-                padding: 5px 10px;
-            }
-            QPushButton:hover {
-                background: qlineargradient(
-                    x1: 0, y1: 0, x2: 0, y2: 1,
-                    stop: 0 black, stop: 1 #333333
-                );
-                color: white;
-            }
-        """)
+        try:
+            with open(file_path, 'r') as file:
+                styles = file.read()
+            self.setStyleSheet(styles)
+        except FileNotFoundError:
+            print("Файл стилей не найден.")
+        except Exception as e:
+            print(f"Ошибка при чтении файла стилей: {e}")
+
+        self.setLayout(self.layout)
 
     def update_fields(self):
         """Обновляет поля ввода в зависимости от выбранной таблицы."""
